@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // Použití IntelliSense ke zjištění, které atributy existují pro ladění v jazyce C#
+            // Popis existujících atributů zobrazíte najetím myší
+            // Další informace najdete na https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
+            "name": ".NET Core Launch (console)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            // Pokud jste změnili cílové architektury, nezapomeňte aktualizovat cestu k programu.
+            "program": "${workspaceFolder}/bin/Debug/net8.0-windows/CncPrieniky3D_Rules.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            // Další informace o poli „console“ najdete v tématu https://aka.ms/VSCode-CS-LaunchJson-Console
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach"
+        }
+    ]
+}

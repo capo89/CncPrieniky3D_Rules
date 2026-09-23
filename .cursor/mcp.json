@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "excel": {
+      "command": "py",
+      "args": ["-3.11", "-m", "excel_mcp", "stdio"]
+    }
+  }
+}

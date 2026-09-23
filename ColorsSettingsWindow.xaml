@@ -1,0 +1,26 @@
+<Window x:Class="CncPrieniky3D.ColorsSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Vlastnosti – farby"
+        Width="420" MinWidth="380" SizeToContent="Height"
+        MaxHeight="720"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="{StaticResource AppBg}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+      <StackPanel x:Name="RowsPanel" Margin="0,0,8,0"/>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button Content="Predvolené" Margin="0,0,8,0" Click="Reset_Click"/>
+      <Button Content="Zrušiť" Margin="0,0,8,0" IsCancel="True" Click="Cancel_Click"/>
+      <Button Content="OK" Style="{StaticResource PrimaryButton}" IsDefault="True" Click="Ok_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>

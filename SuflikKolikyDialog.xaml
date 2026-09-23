@@ -1,0 +1,31 @@
+<Window x:Class="CncPrieniky3D.SuflikKolikyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Počet kolíkov"
+        SizeToContent="WidthAndHeight"
+        MinWidth="360"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource AppBg}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Šufel" Style="{StaticResource SectionHeader}"/>
+    <TextBlock x:Name="InfoText" Grid.Row="1" Margin="0,0,0,14" TextWrapping="Wrap" Style="{StaticResource MutedText}"/>
+
+    <TextBlock Grid.Row="2" Text="Počet kolíkov" Margin="0,0,0,4"/>
+    <DockPanel Grid.Row="3" LastChildFill="True">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+        <Button Content="Zrušiť" Width="90" Margin="0,0,8,0" Click="Cancel_Click" IsCancel="True"/>
+        <Button Content="OK" Width="90" Style="{StaticResource PrimaryButton}" Click="Ok_Click" IsDefault="True"/>
+      </StackPanel>
+      <TextBox x:Name="PocetBox" VerticalAlignment="Center"
+               KeyDown="PocetBox_KeyDown"/>
+    </DockPanel>
+  </Grid>
+</Window>

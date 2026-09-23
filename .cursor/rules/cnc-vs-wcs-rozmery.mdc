@@ -1,0 +1,11 @@
+---
+description: CNC rozmery vs WCS/AABB — úloha 1
+alwaysApply: true
+---
+
+# Rozmery dielca (úloha 1)
+
+- **3D skrinka / dotyky / WCS**: `RozmerX/Y/Z` + Min/WCS z hárku **Kusovnik** (AABB bloku). Nemeniť podľa CNC.
+- **CNC obrobok / `.xcs` / ABS**: `CncRozmerX/Y` + `CncHrubka` (+ ABS) z hárku **Povodny kusovnik**. `PartRules.WorkpieceSize` ich preferuje.
+- **Nezhoda AABB↔CNC**: varovanie pri načítaní (`LoadWarnings`), nie tiché prepisovanie WCS.
+- Otočenie X↔Y len ak Y > 1350 a po otočení Y ≤ 1350 (nie „väčšie = X“).

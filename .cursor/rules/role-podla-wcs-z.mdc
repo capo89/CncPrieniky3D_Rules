@@ -1,0 +1,22 @@
+---
+description: Role dno/vrch/priecka podľa WCS Z; bok L/P podľa vonkajšej plochy
+alwaysApply: true
+---
+
+# Role dielcov (úloha 1)
+
+- **Bok L / P**: `DetectRole(diel, doc)` podľa **vonkajšej plochy** (nie písmeno v názve):
+  - os medzi bokmi = X alebo Y (väčší rozostup stredov); **skr2 / typická skrinka = X**
+  - os **X**: **L = min X**, **P = max X** (vonkajšia 0 / 597)
+  - os **Y**: **L = max Y**, **P = min Y** (front ≈ min X)
+  - platí pre **vložený aj naložený** korpus (dielec medzi bokmi nie je povinný)
+  - pri načítaní `NormalizeBokLpNamesByWcs` zosúladí príponu L/P v názve (Cislo/značky na solidе)
+- **Chrbát / traverza / polica / stojka**: z názvu.
+- **Vodorovné panely** (hrúbka = `RozmerZ`): podľa WCS Z:
+  - najnižšia = **dno**, najvyššia = **vrch**, medzi = **priecka**.
+- Názov typu „priečka, vrch“ (obe slová) → nerolovať podľa „vrch“; rozhoduje Z.
+- **Duplicitný názov** pri načítaní: `DisambiguateDuplicateHorizontalNames` doplní `[dno]` / `[vrch]` / `[priecka]`.
+- **`FindDiel`**: najprv **Diel č.**, potom názov (prefix match po disambiguácii).
+- Kolíky / skrutky / `.xcs` vždy cez `DetectRole(diel, doc)`, nie len názov.
+- **Závesy klasické** (`_zaves` / Typ zaves): `CollectZavesOps` → `zavesy` — bez zmeny.
+- **Závesy v rade** (holé „znacenie CNC“ + System32 pár ~32 mm): Typ `zaves_rady` → `CollectZavesRadyOps` → `zavesy_rady`.

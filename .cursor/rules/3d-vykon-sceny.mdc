@@ -1,0 +1,42 @@
+---
+description: Plán výkonu 3D scény (dotyky, popisky, rebuild) — zvyšok nerealizovať, kým to používateľ neskúsi.
+globs: Services/SceneBuilder.cs,Services/ContactDetector.cs,Services/ContactBoxVisual3D.cs,MainWindow.xaml,MainWindow.xaml.cs
+alwaysApply: false
+---
+
+# 3D výkon — plán (väčšie skrinky + veľa dotykov)
+
+WPF + HelixToolkit.Wpf (`HelixViewport3D`) pri veľkej zostave trhá/seká: každý dotyk = priesvitný `ContactBoxVisual3D` + `BillboardTextVisual3D` + `PipeVisual3D`; panely sú tiež priesvitné; `RebuildScene()` stavia celú scénu odznova.
+
+**Hotovo:** predvolene vypnuté popisky (`TogContactLabels` `IsChecked="False"` v `MainWindow.xaml`). Používateľ ich zapne, keď ich potrebuje.
+
+**Nerealizovať ďalšie body, kým to používateľ výslovne neskúsi.** Poradie podľa zisku:
+
+## 1. Popisky len pre výber / pri rotácii schovať
+- Teraz: `CreateContactVisuals` kreslí `BillboardTextVisual3D` na **každý** dotyk (`SceneBuilder.cs`).
+- Cieľ: popiska len pre vybraný/hover dotyk; alebo schovať všetky popisky počas ťahania kamery a vrátiť po `MouseUp`.
+- Billboard je najťažší objekt v scéne.
+
+## 2. Plochy bez priesvitnosti
+- Teraz: box opacity 0.8 na paneli 0.92, hrúbka 6 mm (`ContactDetector` + `CreateContactVisuals`) → z-fighting a ťažký alpha blend.
+- Cieľ: emissive / nepriehľadný tenký quad, 1–2 mm odsadený od plochy. 6 mm hit-box môže ostať na klik (neviditeľný / len outline).
+
+## 3. Jeden mesh pre neoznačené plochy
+- Teraz: N samostatných `BoxVisual3D`.
+- Cieľ: jeden `MeshGeometry3D` pre všetky neoznačené dotyky; výber/hover ako malý overlay (`ContactBoxVisual3D` ostane na klik).
+
+## 4. Nerebuildovať celú scénu
+- Teraz: `RebuildScene()` / `RebuildSceneCore()` pri výbere, farbe, opacity slideri, …
+- Cieľ: cache meshov dielcov; pri kliknutí na dotyk meniť len farbu/viditeľnosť, nie `Viewport.Children` odznova.
+
+## 5. Pri ťahaní kamery schovať ťažké vrstvy
+- Popisky + priesvitné dotyky vypnúť počas rotácie/panu, po pustení myši vrátiť.
+- Doplnok k bodu 1, nie náhrada.
+
+## 6. Až nakoniec: HelixToolkit.SharpDX
+- GPU cesta, väčší zásah (nový viewport, materiály, hit-test). Až keď body 1–5 nestačia.
+
+## Čo nemenit pri týchto úpravách
+- Detekcia dotykov (`ContactDetector` logika AABB) a WCS/CNC rozmery (pozri `cnc-vs-wcs-rozmery`).
+- Karta **Celá skrinka** ostáva bez plôch dotykov.
+- Toggle **Dotyky dielov** / **Popisky D…** ostávajú v UI.

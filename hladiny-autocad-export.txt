@@ -1,0 +1,55 @@
+﻿Hladiny pre AutoCAD export (CncExporter / CncPrieniky3D)
+========================================================
+Účel: pevné názvy vrstiev, ktoré export rozpozná a zapíše do Excelu.
+Vnútri bloku môže byť teleso na vrstve 0 — berie sa vrstva INZERCIE bloku.
+
+
+1) CNC ZNAČENIE (body / valčeky / bloky na dielci)
+-------------------------------------------------
+A) Podperky — hladina „kovanie“ (BEZ prepisovania na znacenie CNC_*):
+  kovanie                   ← PODPERKY len ak súčasne:
+                                Priemer ≈ 3 mm (±1.0)
+                                Hĺbka   ≈ 12 mm (±1.0; CAD často ~12.37)
+                              iné telesá na „kovanie“ (pánty…) ostanú v Prienikoch
+
+B) Prefix „znacenie CNC…“ (movento / magnet / …):
+  znacenie CNC movento
+  znacenie CNC_podperky     ← explicitne podperky (voliteľné)
+  znacenie CNC_magnet
+  znacenie CNC_nohy
+  znacenie CNC_zaves
+  znacenie CNC              ← spätná kompatibilita = tiež podperky
+
+Príklady variantov, ktoré tiež prejdú:
+  znacenie CNC_movento
+  znacenie CNC magnet
+  CNC znacenie movento   (obrátený slovosled – export to tiež berie)
+
+
+2) PRIENIKY (prelínajúce telesá voči dielu)
+------------------------------------------
+  kovanie     ← telesá, ktoré NIE SÚ Ø3×12 (pánty…); podperky idú do Znacenie CNC
+  spotrebiče
+
+(Export: typ „Kovanie“ na hárku Prieniky.)
+
+
+3) MATERIÁL DIELCA (informácia z kusovníka / solid)
+--------------------------------------------------
+Nie je to CNC značenie — len názov vrstvy materiálu dielca, napr.:
+
+  01 DTD 18 - 5981
+  01 DTD 18 korpus
+  01 DTD 10 U702
+
+(ľubovoľný názov podľa skladu; export ho len skopíruje do stĺpca Vrstva)
+
+
+POZNÁMKY
+--------
+- Kolíky/skrutky sa v AutoCADe na vrstvu nedávajú — zadávajú sa v appke na styčných plochách.
+- Police: podperky = Solid/blok Ø3 × dĺžka 12 — hladina môže byť „kovanie“ alebo „spotrebiče“
+  (Typ=Kovanie + Ø3×12). Veľké pánty na spotrebičoch ostanú v Prienikoch.
+- Appka: rozhoduje geometria Ø3×12, nie len názov vrstvy.
+- Obdĺžnikové ARRAY: export prechádza všetky položky poľa (AssocArray), nielen zdroj.
+- Po úprave exportéra znova spusti EXPORTBLOKUAUTO.

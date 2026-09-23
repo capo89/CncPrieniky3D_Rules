@@ -1,0 +1,103 @@
+<Window x:Class="CncPrieniky3D.KolikovatDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Kolíkovať – nová séria"
+        MinHeight="360" Height="420" MinWidth="420" Width="440"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="{StaticResource AppBg}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="170"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Name="InfoText"
+               Margin="0,0,0,14" TextWrapping="Wrap" Style="{StaticResource MutedText}"/>
+
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+               Text="1. séria (od predu)" FontWeight="SemiBold"
+               Margin="0,0,0,6" Style="{StaticResource MutedText}"/>
+
+    <TextBlock x:Name="OdPreduLabel" Grid.Row="2" Grid.Column="0" Text="Od predu (mm)" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+    <TextBox x:Name="OdPreduBox" Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
+             KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+    <TextBlock Grid.Row="3" Grid.Column="0" Text="Počet kolíkov" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+    <TextBox x:Name="PocetBox" Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"
+             KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+    <TextBlock Grid.Row="4" Grid.Column="0" Text="Rozteč kolíkov (mm)" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+    <TextBox x:Name="RoztecBox" Grid.Row="4" Grid.Column="1" Margin="0,0,0,8"
+             KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+    <CheckBox x:Name="ZoStreduBox" Grid.Row="5" Grid.ColumnSpan="2"
+              Content="Zo stredu"
+              Margin="0,4,0,4"
+              Checked="ZoStreduBox_Changed" Unchecked="ZoStreduBox_Changed"
+              ToolTip="1. kolík = stred − ((počet−1)/2)·rozteč, ďalej +rozteč"/>
+
+    <CheckBox x:Name="ZDruhejStranyBox" Grid.Row="6" Grid.ColumnSpan="2"
+              Content="Aj z druhej strany"
+              Margin="0,0,0,4"
+              Checked="ZDruhejStranyBox_Changed" Unchecked="ZDruhejStranyBox_Changed"
+              ToolTip="Zobrazí polia pre 2. sériu meranú od opačnej hrany"/>
+
+    <!-- 2. séria — viditeľná len pri „Aj z druhej strany“ -->
+    <Border x:Name="SecondSeriePanel" Grid.Row="7" Grid.ColumnSpan="2"
+            Visibility="Collapsed" Margin="0,8,0,0"
+            BorderBrush="{StaticResource AppBorder}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="170"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                   Text="2. séria (z druhej strany)" FontWeight="SemiBold"
+                   Margin="0,0,0,6" Style="{StaticResource MutedText}"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Od predu (mm)" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+        <TextBox x:Name="OdPredu2Box" Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"
+                 KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+                 PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Počet kolíkov" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+        <TextBox x:Name="Pocet2Box" Grid.Row="2" Grid.Column="1" Margin="0,0,0,8"
+                 KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+                 PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Rozteč kolíkov (mm)" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+        <TextBox x:Name="Roztec2Box" Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"
+                 KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+                 PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+      </Grid>
+    </Border>
+
+    <StackPanel Grid.Row="8" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+      <Button Content="Zrušiť" Width="90" Margin="0,0,8,0" Click="Cancel_Click" IsCancel="True"/>
+      <Button x:Name="OkButton" Content="Pridať sériu" Width="120" Style="{StaticResource PrimaryButton}"
+              Click="Ok_Click" IsDefault="True"/>
+    </StackPanel>
+  </Grid>
+</Window>

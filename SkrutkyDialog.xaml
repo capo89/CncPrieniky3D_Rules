@@ -1,0 +1,78 @@
+<Window x:Class="CncPrieniky3D.SkrutkyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Skrutky – nová séria"
+        MinHeight="400" Height="440" MinWidth="460" Width="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="{StaticResource AppBg}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="160"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Name="InfoText"
+               Margin="0,0,0,14" TextWrapping="Wrap" Style="{StaticResource MutedText}"/>
+
+    <CheckBox x:Name="SymetrickeBox" Grid.Row="1" Grid.ColumnSpan="2"
+              Content="Symetrické"
+              Margin="0,0,0,6"
+              Checked="Symetricke_Changed" Unchecked="Symetricke_Changed"
+              ToolTip="Zadáš len Od predu a počet; rozteč sa spočíta zo zvolenej dĺžky"/>
+
+    <StackPanel x:Name="SymModePanel" Grid.Row="2" Grid.ColumnSpan="2" Margin="20,0,0,10"
+                Visibility="Collapsed">
+      <RadioButton x:Name="SymDotykRadio" Content="1) Podľa dĺžky dotyku"
+                   IsChecked="True" Margin="0,0,0,4"
+                   GroupName="SymMode"
+                   Checked="SymMode_Changed"
+                   ToolTip="rozteč = (dĺžka dotyku − 2·Od predu) / (počet − 1)"/>
+      <RadioButton x:Name="SymKolikyRadio" Content="2) Medzi 1. a posledným kolíkom"
+                   Margin="0,0,0,0"
+                   GroupName="SymMode"
+                   Checked="SymMode_Changed"
+                   ToolTip="rozteč = (rozpätie kolíkov − 2·Od predu) / (počet − 1); Od predu od 1. kolíka"/>
+    </StackPanel>
+
+    <TextBlock x:Name="OdPreduLabel" Grid.Row="3" Grid.Column="0" Text="Od predu (mm)" VerticalAlignment="Center" Margin="0,0,0,8"/>
+    <TextBox x:Name="OdPreduBox" Grid.Row="3" Grid.Column="1" Margin="0,0,0,8"
+             KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+    <TextBlock Grid.Row="4" Grid.Column="0" Text="Počet skrutiek" VerticalAlignment="Center" Margin="0,0,0,8"/>
+    <TextBox x:Name="PocetBox" Grid.Row="4" Grid.Column="1" Margin="0,0,0,8"
+             KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+    <TextBlock x:Name="RoztecLabel" Grid.Row="5" Grid.Column="0" Text="Rozteč (mm)" VerticalAlignment="Center" Margin="0,0,0,8"/>
+    <TextBox x:Name="RoztecBox" Grid.Row="5" Grid.Column="1" Margin="0,0,0,8"
+             KeyDown="Field_KeyDown" GotKeyboardFocus="Field_GotKeyboardFocus"
+             PreviewMouseLeftButtonDown="Field_PreviewMouseLeftButtonDown"/>
+
+    <CheckBox x:Name="ZDruhejStranyBox" Grid.Row="6" Grid.ColumnSpan="2"
+              Content="Z druhej strany"
+              Margin="0,4,0,8"
+              ToolTip="Od predu sa meria od opačnej hrany plochy"/>
+
+    <TextBlock Grid.Row="7" Grid.ColumnSpan="2" Margin="0,4,0,0" Style="{StaticResource DimText}"
+               TextWrapping="Wrap"
+               Text="Stred plochy. Ø3 mm cez plochu. Symetrické 1 = dĺžka dotyku; 2 = medzi krajnými kolíkmi (Od predu od 1. kolíka)."/>
+
+    <StackPanel Grid.Row="8" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+      <Button Content="Zrušiť" Width="90" Margin="0,0,8,0" Click="Cancel_Click" IsCancel="True"/>
+      <Button Content="Pridať sériu" Width="110" Style="{StaticResource PrimaryButton}" Click="Ok_Click" IsDefault="True"/>
+    </StackPanel>
+  </Grid>
+</Window>

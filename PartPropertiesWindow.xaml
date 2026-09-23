@@ -1,0 +1,90 @@
+﻿<Window x:Class="CncPrieniky3D.PartPropertiesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Vlastnosti dielca"
+        Width="560" MinWidth="480" MinHeight="360"
+        SizeToContent="Height"
+        MaxHeight="780"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="{StaticResource AppBg}">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <ScrollViewer Grid.Row="0"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,4,0">
+      <StackPanel Margin="0,0,8,0">
+        <TextBlock Text="Dielec" Style="{StaticResource SectionHeader}"/>
+        <TextBlock x:Name="NameText" Margin="0,0,0,12" TextWrapping="Wrap"/>
+        <TextBlock x:Name="SizeText" Margin="0,0,0,16" TextWrapping="Wrap" Style="{StaticResource DimText}"/>
+
+        <CheckBox x:Name="FlipCheck"
+                  Content="Otočiť spodkom hore"
+                  VerticalContentAlignment="Center"/>
+        <TextBlock Margin="24,6,0,0" Style="{StaticResource DimText}" TextWrapping="Wrap"
+                   Text="Dielec sa otočí na CNC: Left↔Right. Spodná plocha je po otočení hore → Bottom sa exportuje ako Top. X/Y bez zmeny."/>
+
+        <StackPanel x:Name="AbsOrientPanel" Margin="0,16,0,0">
+          <TextBlock Style="{StaticResource SectionHeader}" Text="ABS y (pohľad na skrinku)" TextWrapping="Wrap"/>
+          <TextBlock x:Name="AbsOrientHint" Style="{StaticResource DimText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+          <StackPanel x:Name="AbsHoreDolePanel" Orientation="Horizontal">
+            <RadioButton x:Name="AbsHoreRadio" Content="Hore" Margin="0,0,16,0"
+                         GroupName="AbsHd" Checked="AbsMapping_Changed"/>
+            <RadioButton x:Name="AbsDoleRadio" Content="Dole"
+                         GroupName="AbsHd" Checked="AbsMapping_Changed"/>
+          </StackPanel>
+          <TextBlock Margin="0,6,0,0" Style="{StaticResource DimText}" TextWrapping="Wrap"
+                     Text="Pri bokoch: dole → L = vpravo, P = vľavo (v CreateMessage). Hore = opak."/>
+        </StackPanel>
+
+        <StackPanel x:Name="AbsPaskaPanel" Margin="0,14,0,0">
+          <TextBlock Style="{StaticResource SectionHeader}" Text="Hrúbka ABS pásky (mm)"/>
+          <TextBox x:Name="AbsPaskaBox" Width="80" HorizontalAlignment="Left"
+                   ToolTip="Parameter ABS pre makro Obeh_novy_DTD (default 0.8)"/>
+          <TextBlock Margin="0,4,0,0" Style="{StaticResource DimText}" TextWrapping="Wrap"
+                     Text="Do XCS ide len táto hrúbka + strany pásky; ostatné parametre obehu necháva makro."/>
+        </StackPanel>
+
+        <TextBlock Margin="0,14,0,4" Style="{StaticResource SectionHeader}" Text="Poznámka (CreateMessage)"/>
+        <TextBox x:Name="InfoMessageBox"
+                 MinHeight="52"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 TextChanged="InfoMessageBox_TextChanged"/>
+        <TextBlock Margin="0,4,0,0" Style="{StaticResource DimText}" TextWrapping="Wrap"
+                   Text="Predvyplnené z ABS — môžeš dopísať / upraviť. Prázdne = auto z ABS pri exporte."/>
+        <TextBlock x:Name="AbsPreviewText" Margin="0,8,0,0" FontSize="12" TextWrapping="Wrap"/>
+
+        <CheckBox x:Name="DruheUpnutieCheck"
+                  Margin="0,16,0,0"
+                  Content="Druhé upnutie"
+                  VerticalContentAlignment="Center"
+                  Checked="DruheUpnutie_Changed"
+                  Unchecked="DruheUpnutie_Changed"/>
+        <TextBlock Margin="24,4,0,0" Style="{StaticResource DimText}" TextWrapping="Wrap"
+                   Text="Vytvorí súbory _A (odsadenie 2.5) a _B (odsadenie 100). Do poznámky _A vždy doplní „ - druhe up. po ABS“."/>
+
+        <StackPanel x:Name="DruheUpnutiePanel" Margin="0,10,0,8" Visibility="Collapsed">
+          <TextBlock Style="{StaticResource SectionHeader}" TextWrapping="Wrap"
+                     Text="Poznámka druhé upnutie (_B)"/>
+          <TextBox x:Name="InfoMessageBBox"
+                   MinHeight="52"
+                   AcceptsReturn="True"
+                   TextWrapping="Wrap"
+                   VerticalScrollBarVisibility="Auto"/>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+      <Button Content="Zrušiť" Width="90" Margin="0,0,8,0" IsCancel="True" Click="Cancel_Click"/>
+      <Button Content="OK" Width="90" Style="{StaticResource PrimaryButton}" IsDefault="True" Click="Ok_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>
