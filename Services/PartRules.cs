@@ -278,6 +278,8 @@ internal abstract class PartRules
     /// <summary>
     /// Medzi vodorovnými panelmi: najnižšia = dno, najvyššia = vrch, ostatné = priečka.
     /// Police (názov) sa vynechajú z kandidátov dno/vrch.
+    /// Ambiguous „priečka, vrch“: nikdy neberie slot dno (ten patrí samostatnému „dno“);
+    /// v skupine rovnakého názvu: nižšia = priečka, vyššia = vrch.
     /// </summary>
     public static string? ResolveHorizontalRoleByZ(DielecModel diel, ExportDocument doc)
     {
@@ -288,6 +290,8 @@ internal abstract class PartRules
         if (nameRole == "polica")
             return "polica";
 
+        bool ambiguous = IsAmbiguousHorizontalName(diel.Nazov);
+
         var horizontals = doc.KorpusDiely
             .Where(d => IsHorizontalPanel(d))
             .Where(d => DetectRole(d.Nazov) != "polica")
@@ -296,6 +300,29 @@ internal abstract class PartRules
             return null;
 
         static double CenterZ(DielecModel d) => d.WcsMinZ + d.RozmerZ * 0.5;
+
+        // Ambiguous CAD názov (priečka+vrch): len medzi kópiami rovnakého mená
+        // → [priecka]/[vrch], nie [dno] (dno je samostatný dielec v Exceli).
+        if (ambiguous)
+        {
+            string baseName = StripRoleMarks(diel.Nazov);
+            var peers = horizontals
+                .Where(d => string.Equals(StripRoleMarks(d.Nazov), baseName, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(CenterZ)
+                .ThenBy(d => d.Cislo)
+                .ToList();
+            if (peers.Count >= 2)
+            {
+                if (ReferenceEquals(diel, peers[^1]))
+                    return "vrch";
+                return "priecka";
+            }
+            // Jediný ambiguous — ak je globálne najvyšší → vrch, inak priečka.
+            var allOrdered = horizontals.OrderBy(CenterZ).ThenBy(d => d.Cislo).ToList();
+            if (ReferenceEquals(diel, allOrdered[^1]))
+                return "vrch";
+            return "priecka";
+        }
 
         var ordered = horizontals
             .OrderBy(CenterZ)
@@ -313,9 +340,9 @@ internal abstract class PartRules
             return "dno";
         }
 
-        if (ReferenceEquals(diel, lowest) || diel.Cislo == lowest.Cislo)
+        if (ReferenceEquals(diel, lowest))
             return "dno";
-        if (ReferenceEquals(diel, highest) || diel.Cislo == highest.Cislo)
+        if (ReferenceEquals(diel, highest))
             return "vrch";
 
         // Rovnaká výška ako dno/vrch (duplicitný solid) — podľa blízkosti.
@@ -329,6 +356,25 @@ internal abstract class PartRules
             return "vrch";
 
         return "priecka";
+    }
+
+    /// <summary>Názov obsahuje priečka aj vrch/dno — rolu určí Z (nie slovo vrch/dno).</summary>
+    public static bool IsAmbiguousHorizontalName(string? nazov)
+    {
+        string n = StripDiacritics(nazov ?? "");
+        bool hasPrieck = n.Contains("prieck");
+        bool hasVrch = n.Contains("vrch");
+        bool hasDno = n.Contains("dno");
+        return hasPrieck && (hasVrch || hasDno);
+    }
+
+    /// <summary>Odstráni prípony [dno]/[vrch]/[priecka] a #cislo pre porovnanie peerov.</summary>
+    public static string StripRoleMarks(string? nazov)
+    {
+        string s = (nazov ?? "").Trim();
+        s = Regex.Replace(s, @"\s*\[(dno|vrch|priecka)\]\s*", " ", RegexOptions.IgnoreCase);
+        s = Regex.Replace(s, @"\s*#\d+\s*$", "");
+        return Regex.Replace(s, @"\s+", " ").Trim();
     }
 
     /// <summary>

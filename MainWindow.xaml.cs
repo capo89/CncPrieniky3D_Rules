@@ -15,15 +15,19 @@ namespace CncPrieniky3D;
 
 public partial class MainWindow : Window
 {
+    private readonly List<ExportDocument> _docs = new();
     private ExportDocument? _doc;
     private string? _sourceExcelPath;
     private readonly List<Visual3D> _sceneVisuals = new();
     private bool _suppressContactUi;
     private bool _suppressPartProps;
+    private bool _suppressSkrinkaTabs;
     private Point _mouseDownPos;
     private bool _mouseMoved;
     private List<KolikSerie>? _kolikyClipboard;
     private bool _suflikPromptOpen;
+    private readonly HashSet<DielecModel> _multiSelectedParts = new();
+    private bool _partCtrlClickHandled;
 
     public MainWindow()
     {
@@ -92,12 +96,13 @@ public partial class MainWindow : Window
         var dlg = new OpenFileDialog
         {
             Filter = "Excel (*.xlsx)|*.xlsx|Všetky súbory (*.*)|*.*",
-            Title = "Otvoriť export z CncExporter2026"
+            Title = "Otvoriť export z CncExporter2026 (Ctrl = viac súborov)",
+            Multiselect = true
         };
         if (dlg.ShowDialog() != true)
             return;
 
-        LoadExcelDocument(dlg.FileName);
+        LoadExcelDocuments(dlg.FileNames);
     }
 
     private void OpenProject_Click(object sender, RoutedEventArgs e)
@@ -181,7 +186,7 @@ public partial class MainWindow : Window
 
     private void SaveProject_Click(object sender, RoutedEventArgs e)
     {
-        if (_doc == null || string.IsNullOrEmpty(_sourceExcelPath))
+        if (_docs.Count == 0 || _doc == null || string.IsNullOrEmpty(_sourceExcelPath))
         {
             MessageBox.Show(this, "Najprv otvor Excel export.", "Uložiť projekt",
                 MessageBoxButton.OK, MessageBoxImage.Information);
@@ -191,11 +196,13 @@ public partial class MainWindow : Window
         try
         {
             SaveCurrentSession();
-            string path = ProjectSessionStore.SessionPathForExcel(_sourceExcelPath);
-            StatusText.Text = $"Projekt uložený: {Path.GetFileName(path)}";
-            MessageBox.Show(this,
-                $"Uložené:\n{path}\n\nNačítať späť cez „Otvoriť projekt…“.",
-                "Uložiť projekt", MessageBoxButton.OK, MessageBoxImage.Information);
+            string tip = _docs.Count > 1
+                ? $"Uložené {_docs.Count}× *.cnc3d.json (každá skrinka zvlášť).\nNačítať späť cez „Otvoriť projekt…“."
+                : $"Uložené:\n{ProjectSessionStore.SessionPathForExcel(_sourceExcelPath)}\n\nNačítať späť cez „Otvoriť projekt…“.";
+            StatusText.Text = _docs.Count > 1
+                ? $"Projekty uložené ({_docs.Count} skriniek)"
+                : $"Projekt uložený: {Path.GetFileName(ProjectSessionStore.SessionPathForExcel(_sourceExcelPath))}";
+            MessageBox.Show(this, tip, "Uložiť projekt", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -205,10 +212,16 @@ public partial class MainWindow : Window
 
     private void SaveCurrentSession()
     {
-        if (_doc == null || string.IsNullOrEmpty(_sourceExcelPath))
+        if (_docs.Count == 0)
             return;
-        ProjectSessionStore.Save(_sourceExcelPath, _doc);
-        UiInputLogger.Write("SaveProject", ProjectSessionStore.SessionPathForExcel(_sourceExcelPath));
+        foreach (var doc in _docs)
+        {
+            if (string.IsNullOrEmpty(doc.ExcelPath))
+                continue;
+            ProjectSessionStore.Save(doc.ExcelPath, doc);
+        }
+        if (!string.IsNullOrEmpty(_sourceExcelPath))
+            UiInputLogger.Write("SaveProject", ProjectSessionStore.SessionPathForExcel(_sourceExcelPath));
     }
 
     private void TryAutoSaveSession()
@@ -221,89 +234,220 @@ public partial class MainWindow : Window
         string excelPath,
         ProjectSessionStore.ProjectSessionDto? forceSession = null,
         string? forceUiLogPath = null)
+        => LoadExcelDocuments(new[] { excelPath }, forceSession, forceUiLogPath);
+
+    private void LoadExcelDocuments(
+        IReadOnlyList<string> excelPaths,
+        ProjectSessionStore.ProjectSessionDto? forceSession = null,
+        string? forceUiLogPath = null)
     {
+        if (excelPaths.Count == 0)
+            return;
+
         try
         {
-            _doc = ExcelExportLoader.Load(excelPath);
-            _sourceExcelPath = excelPath;
-            UiInputLogger.SetExcelPath(_sourceExcelPath);
-            UiInputLogger.Write("OpenExcel", excelPath);
-            _doc.Dotyky.Clear();
-            foreach (var c in ContactDetector.Find(_doc.KorpusDiely.ToList()))
-                _doc.Dotyky.Add(c);
-            SuflikContactBuilder.Attach(_doc);
-
-            // Obnovenie kolíkov/skrutiek len cez „Otvoriť projekt…“ (forceSession / forceUiLogPath).
-            ProjectSessionStore.ProjectSessionDto? session = forceSession;
-            bool restoredFromUiLog = false;
-            if (session != null)
+            var loaded = new List<ExportDocument>();
+            foreach (string excelPath in excelPaths)
             {
-                int n = ProjectSessionStore.Apply(_doc, session);
-                UiInputLogger.Write("LoadProject", $"položiek≈{n}; saved={session.SavedAt:yyyy-MM-dd HH:mm}");
-            }
-            else if (forceUiLogPath != null)
-            {
-                int n = UiLogSessionReplayer.Apply(_doc, File.ReadAllLines(forceUiLogPath));
-                UiInputLogger.Write("LoadUiLog", $"zásahy≈{n}");
-                restoredFromUiLog = n > 0;
-                if (restoredFromUiLog)
-                    TryAutoSaveSession();
+                var doc = ExcelExportLoader.Load(excelPath);
+                SkrinkaNaming.Apply(doc, excelPath);
+                doc.Dotyky.Clear();
+                foreach (var c in ContactDetector.Find(doc.KorpusDiely.ToList()))
+                {
+                    c.SkrinkaKey = doc.SkrinkaKey;
+                    doc.Dotyky.Add(c);
+                }
+                SuflikContactBuilder.Attach(doc);
+                ExcelExportLoader.EnsureDruheUpnutieForNohy(doc);
+                loaded.Add(doc);
             }
 
-            // Po session/log: nohy vždy zapnú DruheUpnutie (viditeľné vo vlastnostiach).
-            ExcelExportLoader.EnsureDruheUpnutieForNohy(_doc);
-
-            PartList.ItemsSource = null;
-            RefreshPartList(_doc.KorpusDiely.FirstOrDefault() ?? _doc.Diely.FirstOrDefault());
-            RefreshContactListUi();
-
-            int body = _doc.Diely.Sum(d => d.Body.Count);
-            int plochy = _doc.Diely.Sum(d => d.Plochy.Count);
-            int vyrezy = _doc.Diely.Sum(d => d.Vyrezy.Count);
-            int cnc = _doc.Diely.Sum(d => d.CncZnacenia.Count);
-            int movento = _doc.Diely.Sum(d => d.CncZnacenia.Count(CncZnacenieTyp.IsMovento));
-            int nKorpus = _doc.KorpusDiely
-                .GroupBy(d => PartRules.CncGroupKey(d, _doc), StringComparer.OrdinalIgnoreCase)
-                .Count();
-            int nKorpusInst = _doc.KorpusDiely.Count();
-            int nSuflikInd = _doc.SuflikDiely.Count(d => !d.JeSuflikPozicia);
-            int nPoz = _doc.SuflikDiely.Count(d => d.JeSuflikPozicia);
-            int bodySuflik = _doc.SuflikDiely.Where(d => !d.JeSuflikPozicia).Sum(d => d.Body.Count);
-            int visibleDotyky = _doc.Dotyky.Count(c => !c.JeSuflikAuto && !PartRules.IsPolicaContact(c));
-            int nKol = _doc.Dotyky.Where(c => !c.JeSuflikAuto).Sum(c => c.CelkovyPocetKolikov);
-            int nSkr = _doc.Dotyky.Where(c => !c.JeSuflikAuto).Sum(c => c.CelkovyPocetSkrutiek);
-            string korpusTxt = nKorpusInst == nKorpus
-                ? $"{nKorpus}"
-                : $"{nKorpus} ({nKorpusInst} ks)";
-            StatusText.Text =
-                $"Blok „{_doc.BlockName}“ — korpus {korpusTxt}, šufle {nSuflikInd} dielov ({bodySuflik} bodov)/{nPoz} poz., " +
-                $"výrezy {vyrezy}, plochy-body {plochy}, body {body}, CNC {cnc} (movento {movento}), {visibleDotyky} dotykov";
-            if (session != null)
-                StatusText.Text += $", obnovené kolíky {nKol}× / skrutky {nSkr}×";
-            else if (restoredFromUiLog)
-                StatusText.Text += $", obnovené z _ui.log: kolíky {nKol}× / skrutky {nSkr}×";
-            StatusText.Text += ".";
-            int nCncDims = _doc.KorpusDiely.Count(d => d.HasCncRozmery);
-            if (nCncDims > 0)
-                StatusText.Text += $" | CNC rozmery {nCncDims}×";
-            if (_doc.LoadWarnings.Count > 0)
+            // Session / ui.log len pri jednom súbore (projekt je viazaný na Excel).
+            if (loaded.Count == 1)
             {
-                StatusText.Text += $" | ⚠ AABB≠CNC: {_doc.LoadWarnings.Count}";
-                string msg = "Nezhoda AABB (3D) ↔ CNC (pôvodný kusovník):\n\n"
-                    + string.Join("\n", _doc.LoadWarnings.Take(20));
-                if (_doc.LoadWarnings.Count > 20)
-                    msg += $"\n… a ďalších {_doc.LoadWarnings.Count - 20}";
-                msg += "\n\n3D ostáva podľa WCS/AABB; obrobok .xcs podľa CNC rozmerov.";
-                MessageBox.Show(this, msg, "Kontrola rozmerov", MessageBoxButton.OK, MessageBoxImage.Warning);
+                var doc0 = loaded[0];
+                string excelPath = excelPaths[0];
+                ProjectSessionStore.ProjectSessionDto? session = forceSession;
+                bool restoredFromUiLog = false;
+                if (session != null)
+                {
+                    int n = ProjectSessionStore.Apply(doc0, session);
+                    UiInputLogger.Write("LoadProject", $"položiek≈{n}; saved={session.SavedAt:yyyy-MM-dd HH:mm}");
+                }
+                else if (forceUiLogPath != null)
+                {
+                    int n = UiLogSessionReplayer.Apply(doc0, File.ReadAllLines(forceUiLogPath));
+                    UiInputLogger.Write("LoadUiLog", $"zásahy≈{n}");
+                    restoredFromUiLog = n > 0;
+                    if (restoredFromUiLog)
+                    {
+                        _docs.Clear();
+                        _docs.Add(doc0);
+                        SetActiveDoc(doc0, excelPath);
+                        TryAutoSaveSession();
+                    }
+                }
+
+                ExcelExportLoader.EnsureDruheUpnutieForNohy(doc0);
+
+                _docs.Clear();
+                _docs.AddRange(loaded);
+                SetActiveDoc(doc0, excelPaths[0]);
+                UiInputLogger.SetExcelPath(excelPaths[0]);
+                UiInputLogger.Write("OpenExcel", excelPaths[0]);
+
+                ApplyWorkspaceUi(restoredFromUiLog, session != null);
+                return;
             }
-            UpdateSuflikTabVisibility();
-            RebuildScene();
-            Viewport.ZoomExtents();
+
+            _docs.Clear();
+            _docs.AddRange(loaded);
+            SetActiveDoc(loaded[0], excelPaths[0]);
+            UiInputLogger.SetExcelPath(excelPaths[0]);
+            UiInputLogger.Write("OpenExcel", string.Join("; ", excelPaths));
+            ApplyWorkspaceUi(restoredFromUiLog: false, restoredSession: false);
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Chyba načítania", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void SetActiveDoc(ExportDocument doc, string? excelPath = null)
+    {
+        _doc = doc;
+        if (excelPath != null)
+            _sourceExcelPath = excelPath;
+        else if (!string.IsNullOrEmpty(doc.ExcelPath))
+            _sourceExcelPath = doc.ExcelPath;
+    }
+
+    private void ApplyWorkspaceUi(bool restoredFromUiLog, bool restoredSession)
+    {
+        bool multi = _docs.Count > 1;
+        foreach (var d in _docs.SelectMany(x => x.Diely))
+        {
+            if (!multi)
+                d.SkrinkaLabel = "";
+            else if (string.IsNullOrEmpty(d.SkrinkaLabel))
+            {
+                var owner = _docs.FirstOrDefault(doc => doc.SkrinkaKey == d.SkrinkaKey);
+                if (owner != null)
+                    d.SkrinkaLabel = owner.SkrinkaLabel;
+            }
+        }
+
+        _multiSelectedParts.Clear();
+        RebuildSkrinkaTabs();
+
+        PartList.ItemsSource = null;
+        RefreshPartList(_doc?.KorpusDiely.FirstOrDefault() ?? _doc?.Diely.FirstOrDefault());
+        RefreshContactListUi();
+
+        UpdateStatusAfterLoad(restoredFromUiLog, restoredSession);
+        UpdateSuflikTabVisibility();
+        RebuildScene();
+        Viewport.ZoomExtents();
+    }
+
+    private void UpdateStatusAfterLoad(bool restoredFromUiLog, bool restoredSession)
+    {
+        if (_doc == null) return;
+
+        int body = _docs.Sum(d => d.Diely.Sum(x => x.Body.Count));
+        int plochy = _docs.Sum(d => d.Diely.Sum(x => x.Plochy.Count));
+        int vyrezy = _docs.Sum(d => d.Diely.Sum(x => x.Vyrezy.Count));
+        int cnc = _docs.Sum(d => d.Diely.Sum(x => x.CncZnacenia.Count));
+        int movento = _docs.Sum(d => d.Diely.Sum(x => x.CncZnacenia.Count(CncZnacenieTyp.IsMovento)));
+        int nKorpus = _doc.KorpusDiely
+            .GroupBy(d => PartRules.CncGroupKey(d, _doc), StringComparer.OrdinalIgnoreCase)
+            .Count();
+        int nKorpusInst = _doc.KorpusDiely.Count();
+        int nSuflikInd = _doc.SuflikDiely.Count(d => !d.JeSuflikPozicia);
+        int nPoz = _doc.SuflikDiely.Count(d => d.JeSuflikPozicia);
+        int bodySuflik = _doc.SuflikDiely.Where(d => !d.JeSuflikPozicia).Sum(d => d.Body.Count);
+        int visibleDotyky = _doc.Dotyky.Count(c => !c.JeSuflikAuto && !PartRules.IsPolicaContact(c));
+        int nKol = _doc.Dotyky.Where(c => !c.JeSuflikAuto).Sum(c => c.CelkovyPocetKolikov);
+        int nSkr = _doc.Dotyky.Where(c => !c.JeSuflikAuto).Sum(c => c.CelkovyPocetSkrutiek);
+        string korpusTxt = nKorpusInst == nKorpus
+            ? $"{nKorpus}"
+            : $"{nKorpus} ({nKorpusInst} ks)";
+
+        if (_docs.Count > 1)
+        {
+            StatusText.Text =
+                $"{_docs.Count} skriniek — aktívna „{_doc.SkrinkaLabel}\" ({_doc.BlockName}) — " +
+                $"korpus {korpusTxt}, šufle {nSuflikInd}/{nPoz}, {visibleDotyky} dotykov.";
+        }
+        else
+        {
+            StatusText.Text =
+                $"Blok „{_doc.BlockName}“ — korpus {korpusTxt}, šufle {nSuflikInd} dielov ({bodySuflik} bodov)/{nPoz} poz., " +
+                $"výrezy {vyrezy}, plochy-body {plochy}, body {body}, CNC {cnc} (movento {movento}), {visibleDotyky} dotykov";
+            if (restoredSession)
+                StatusText.Text += $", obnovené kolíky {nKol}× / skrutky {nSkr}×";
+            else if (restoredFromUiLog)
+                StatusText.Text += $", obnovené z _ui.log: kolíky {nKol}× / skrutky {nSkr}×";
+            StatusText.Text += ".";
+        }
+
+        int nCncDims = _docs.Sum(d => d.KorpusDiely.Count(x => x.HasCncRozmery));
+        if (nCncDims > 0)
+            StatusText.Text += $" | CNC rozmery {nCncDims}×";
+
+        int warnCount = _docs.Sum(d => d.LoadWarnings.Count);
+        if (warnCount > 0)
+            StatusText.Text += $" | ⚠ AABB≠CNC: {warnCount}";
+    }
+
+    private void RebuildSkrinkaTabs()
+    {
+        _suppressSkrinkaTabs = true;
+        try
+        {
+            SkrinkaTabs.Items.Clear();
+            if (_docs.Count <= 1)
+            {
+                SkrinkaTabsHost.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            SkrinkaTabsHost.Visibility = Visibility.Visible;
+            foreach (var doc in _docs)
+            {
+                var tab = new TabItem
+                {
+                    Header = doc.SkrinkaLabel,
+                    Tag = doc.SkrinkaKey
+                };
+                SkrinkaTabs.Items.Add(tab);
+            }
+
+            int idx = _docs.FindIndex(d => ReferenceEquals(d, _doc));
+            if (idx < 0) idx = 0;
+            SkrinkaTabs.SelectedIndex = idx;
+        }
+        finally
+        {
+            _suppressSkrinkaTabs = false;
+        }
+    }
+
+    private void SkrinkaTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSkrinkaTabs || !IsLoaded || SkrinkaTabs.SelectedItem is not TabItem tab)
+            return;
+        string? key = tab.Tag as string;
+        var doc = _docs.FirstOrDefault(d => d.SkrinkaKey == key);
+        if (doc == null || ReferenceEquals(doc, _doc))
+            return;
+
+        SetActiveDoc(doc);
+        RefreshContactListUi();
+        UpdateSuflikTabVisibility();
+        UpdateStatusAfterLoad(false, false);
+        RebuildScene();
+        Viewport.ZoomExtents();
     }
 
     private void Viewport_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -499,19 +643,67 @@ public partial class MainWindow : Window
 
     private void PartList_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (_doc != null && SelectedDielec() is DielecModel d)
+        if (_partCtrlClickHandled)
         {
-            StatusText.Text =
-                $"Diel „{d.Nazov}“ — {d.RozmerX:0.##}×{d.RozmerY:0.##}×{d.RozmerZ:0.##} | " +
-                $"{BodySolidBuilder.Describe(d)} | CNC {d.CncZnacenia.Count}" +
-                (d.OtocitSpodkomHore ? " | spodkom hore" : "");
+            _partCtrlClickHandled = false;
+            return;
+        }
 
-            bool justSelected = e.NewValue is PartTreeNode n && ReferenceEquals(n.Dielec, d);
-            if (!_suflikPromptOpen && d.JeSuflikPozicia && justSelected && IsLoaded)
+        // Bežný klik (bez Ctrl) zruší multi-výber, okrem práve zvoleného.
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0 && _multiSelectedParts.Count > 0)
+        {
+            var keep = SelectedDielec();
+            ClearMultiSelectParts();
+            if (keep != null && PartList.SelectedItem is PartTreeNode keepNode)
             {
-                // Mimo handleru výberu — inak Refresh/ShowDialog padá (ItemsSource počas SelectedItemChanged).
-                var sufel = d;
-                Dispatcher.BeginInvoke(new Action(() => PromptSuflikPocetKolikov(sufel)));
+                _multiSelectedParts.Add(keep);
+                keepNode.IsMultiSelected = true;
+            }
+        }
+
+        if (SelectedDielec() is DielecModel d)
+        {
+            // Prepni aktívnu skrinku podľa dielca.
+            if (!string.IsNullOrEmpty(d.SkrinkaKey) &&
+                (_doc == null || !string.Equals(_doc.SkrinkaKey, d.SkrinkaKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                var owner = _docs.FirstOrDefault(x =>
+                    string.Equals(x.SkrinkaKey, d.SkrinkaKey, StringComparison.OrdinalIgnoreCase));
+                if (owner != null)
+                {
+                    SetActiveDoc(owner);
+                    _suppressSkrinkaTabs = true;
+                    try
+                    {
+                        for (int i = 0; i < SkrinkaTabs.Items.Count; i++)
+                        {
+                            if (SkrinkaTabs.Items[i] is TabItem ti &&
+                                string.Equals(ti.Tag as string, d.SkrinkaKey, StringComparison.OrdinalIgnoreCase))
+                            {
+                                SkrinkaTabs.SelectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    finally { _suppressSkrinkaTabs = false; }
+                    RefreshContactListUi();
+                    UpdateSuflikTabVisibility();
+                }
+            }
+
+            if (_doc != null)
+            {
+                StatusText.Text =
+                    $"Diel „{d.Nazov}“ — {d.RozmerX:0.##}×{d.RozmerY:0.##}×{d.RozmerZ:0.##} | " +
+                    $"{BodySolidBuilder.Describe(d)} | CNC {d.CncZnacenia.Count}" +
+                    (d.OtocitSpodkomHore ? " | spodkom hore" : "");
+
+                bool justSelected = e.NewValue is PartTreeNode n && ReferenceEquals(n.Dielec, d);
+                if (!_suflikPromptOpen && d.JeSuflikPozicia && justSelected && IsLoaded)
+                {
+                    var sufel = d;
+                    Dispatcher.BeginInvoke(new Action(() => PromptSuflikPocetKolikov(sufel)));
+                }
             }
         }
         RefreshSelectedPartProps();
@@ -569,6 +761,58 @@ public partial class MainWindow : Window
         ContactList.ItemsSource = _doc.Dotyky
             .Where(c => !c.JeSuflikAuto && !PartRules.IsPolicaContact(c))
             .ToList();
+    }
+
+    private void PartList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
+            return;
+
+        var item = ItemsControl.ContainerFromElement(PartList, e.OriginalSource as DependencyObject) as TreeViewItem;
+        if (item?.DataContext is not PartTreeNode node || node.Dielec == null)
+            return;
+
+        e.Handled = true;
+        _partCtrlClickHandled = true;
+        ToggleMultiSelectPart(node);
+    }
+
+    private void ToggleMultiSelectPart(PartTreeNode node)
+    {
+        var d = node.Dielec;
+        if (d == null) return;
+
+        if (_multiSelectedParts.Contains(d))
+        {
+            _multiSelectedParts.Remove(d);
+            node.IsMultiSelected = false;
+        }
+        else
+        {
+            _multiSelectedParts.Add(d);
+            node.IsMultiSelected = true;
+        }
+
+        StatusText.Text = _multiSelectedParts.Count == 0
+            ? "Multi-výber dielcov zrušený."
+            : $"Vybrané dielce: {_multiSelectedParts.Count} (Ctrl+klik). Kolíkovať → partneri (Bok L/P…).";
+    }
+
+    private void ClearMultiSelectParts()
+    {
+        if (PartList.ItemsSource is IEnumerable<PartTreeNode> roots)
+            ClearMultiSelectRecursive(roots);
+        _multiSelectedParts.Clear();
+    }
+
+    private static void ClearMultiSelectRecursive(IEnumerable<PartTreeNode> nodes)
+    {
+        foreach (var n in nodes)
+        {
+            n.IsMultiSelected = false;
+            if (n.Children.Count > 0)
+                ClearMultiSelectRecursive(n.Children);
+        }
     }
 
     private void PartList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -786,8 +1030,9 @@ public partial class MainWindow : Window
 
     private void RefreshPartList(DielecModel? keep)
     {
-        if (_doc == null) return;
-        var tree = PartTreeBuilder.Build(_doc);
+        if (_docs.Count == 0) return;
+        bool multi = _docs.Count > 1;
+        var tree = PartTreeBuilder.BuildMany(_docs, showSkrinkaLabels: multi);
         if (keep != null)
         {
             var node = PartTreeBuilder.FindNode(tree, keep);
@@ -795,11 +1040,21 @@ public partial class MainWindow : Window
             {
                 ExpandAncestors(tree, keep);
                 node.IsSelected = true;
+                if (_multiSelectedParts.Contains(keep))
+                    node.IsMultiSelected = true;
             }
         }
         else if (tree.Count > 0)
         {
             tree[0].IsSelected = true;
+        }
+
+        // Obnov multi-vizuál po rebinde
+        foreach (var d in _multiSelectedParts.ToList())
+        {
+            var n = PartTreeBuilder.FindNode(tree, d);
+            if (n != null) n.IsMultiSelected = true;
+            else _multiSelectedParts.Remove(d);
         }
 
         PartList.ItemsSource = null;
@@ -1032,11 +1287,84 @@ public partial class MainWindow : Window
         var targets = ContactList.SelectedItems.Cast<ContactMark>().ToList();
         if (targets.Count == 0)
         {
+            if (TryKolikovatFromParts())
+                return;
             MessageBox.Show(this,
-                "Vyber jednu alebo viac styčných plôch (Ctrl+klik v 3D / v zozname).",
+                "Vyber styčné plochy (Ctrl+klik), alebo dielce v zozname Diely (Ctrl+klik) a znova Kolíkovať.",
                 "Kolíkovať", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+
+        ApplyKolikyToContacts(targets);
+    }
+
+    /// <summary>
+    /// Kolíkovanie podľa dielcov: partneri (Bok L/P…) + kontrola osi Y/X.
+    /// </summary>
+    private bool TryKolikovatFromParts()
+    {
+        var parts = _multiSelectedParts.ToList();
+        if (parts.Count == 0 && SelectedDielec() is DielecModel one && !one.JeSuflikPozicia)
+            parts.Add(one);
+        if (parts.Count == 0)
+            return false;
+
+        var selected = new List<(ExportDocument Doc, DielecModel Dielec)>();
+        foreach (var d in parts)
+        {
+            var doc = _docs.FirstOrDefault(x =>
+                string.Equals(x.SkrinkaKey, d.SkrinkaKey, StringComparison.OrdinalIgnoreCase)
+                && x.Diely.Contains(d));
+            doc ??= _docs.FirstOrDefault(x => x.Diely.Contains(d));
+            if (doc != null)
+                selected.Add((doc, d));
+        }
+        if (selected.Count == 0)
+            return false;
+
+        var roles = PartKolikBatch.AvailablePartnerRoles(selected);
+        if (roles.Count == 0)
+        {
+            MessageBox.Show(this,
+                "Vybrané dielce nemajú (korpusové) styčné plochy.",
+                "Kolíkovať dielce", MessageBoxButton.OK, MessageBoxImage.Information);
+            return true;
+        }
+
+        string info =
+            $"Dielce: {selected.Count}×\n" +
+            string.Join(", ", selected.Select(s =>
+                string.IsNullOrEmpty(s.Dielec.SkrinkaLabel)
+                    ? s.Dielec.Nazov
+                    : $"{s.Dielec.SkrinkaLabel}/{s.Dielec.Nazov}")) +
+            "\n\nZaškrtni partnerov, na ktorých dotyky sa majú pridať kolíky:";
+
+        var partnerDlg = new PartKolikPartnersDialog(roles, info) { Owner = this };
+        if (partnerDlg.ShowDialog() != true)
+            return true;
+
+        var partTargets = PartKolikBatch.FindTargets(selected, partnerDlg.SelectedRoles);
+        if (!PartKolikBatch.TryValidateSeriesDims(selected, partTargets, out string dimMsg))
+        {
+            MessageBox.Show(this, dimMsg, "Kolíkovať dielce", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return true;
+        }
+
+        if (dimMsg.Contains("Varovanie", StringComparison.OrdinalIgnoreCase))
+        {
+            if (MessageBox.Show(this, dimMsg, "Kolíkovať dielce",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return true;
+        }
+
+        ApplyKolikyToContacts(partTargets, seriesInfoPrefix: dimMsg + "\n\n");
+        return true;
+    }
+
+    private void ApplyKolikyToContacts(List<ContactMark> targets, string? seriesInfoPrefix = null)
+    {
+        if (targets.Count == 0)
+            return;
 
         foreach (var c in targets)
         {
@@ -1049,16 +1377,12 @@ public partial class MainWindow : Window
         }
 
         var first = targets[0];
-        string info = targets.Count == 1
+        string info = (seriesInfoPrefix ?? "") + (targets.Count == 1
             ? $"Plocha: {first.LabelText}\n{first.PartA}  ↔  {first.PartB}\n" +
               $"Existujúce série: {first.KolikSerie.Count} (pridá sa nová)"
-            : $"Počet plôch: {targets.Count}\nNa každú sa pridá nová séria kolíkov.";
+            : $"Počet plôch: {targets.Count}\nNa každú sa pridá nová séria kolíkov.");
 
-        var dlg = new KolikovatDialog(info)
-        {
-            Owner = this
-        };
-
+        var dlg = new KolikovatDialog(info) { Owner = this };
         if (dlg.ShowDialog() != true)
             return;
 
@@ -1077,7 +1401,14 @@ public partial class MainWindow : Window
             }
         }
 
-        RefreshContactList(targets);
+        var activeTargets = targets.Where(c => _doc != null &&
+            (string.IsNullOrEmpty(c.SkrinkaKey) ||
+             string.Equals(c.SkrinkaKey, _doc.SkrinkaKey, StringComparison.OrdinalIgnoreCase))).ToList();
+        if (activeTargets.Count > 0)
+            RefreshContactList(activeTargets);
+        else
+            RefreshContactListUi();
+
         UiInputLogger.Write("Kolikovat",
             $"plôch={targets.Count}; ciele=[{string.Join(", ", targets.Select(UiInputLogger.FormatContact))}] | " +
             UiInputLogger.FormatKolikSerieList(dlg.SerieList));
@@ -1215,57 +1546,41 @@ public partial class MainWindow : Window
 
     private void Generovat_Click(object sender, RoutedEventArgs e)
     {
-        if (_doc == null)
+        if (_doc == null || _docs.Count == 0)
         {
             MessageBox.Show(this, "Najprv otvor Excel export.", "Generovať",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        string? outDir = null;
-        if (!string.IsNullOrEmpty(_sourceExcelPath))
-        {
-            outDir = Path.Combine(Path.GetDirectoryName(_sourceExcelPath)!, "XCS");
-        }
-        else
-        {
-            var save = new SaveFileDialog
-            {
-                Title = "Vyber priečinok pre XCS (zadaj názov ľubovoľného súboru)",
-                FileName = "XCS",
-                Filter = "Priečinok|*.*"
-            };
-            if (save.ShowDialog() != true)
-                return;
-            outDir = Path.GetDirectoryName(save.FileName);
-        }
-
-        if (string.IsNullOrEmpty(outDir))
-            return;
-
         try
         {
-            Directory.CreateDirectory(outDir);
-            int n = XcsProgramGenerator.GenerateAll(_doc, outDir);
-
-            // Viewer: kolíky/skrutky do plochy (vizuál), nie XCS pravidlá
-            var drills = DrillGenerator.Generate(_doc);
-            if (drills.Count > 0)
-                DrillGenerator.ApplyToCncZnacenia(_doc, drills);
+            int n = 0;
+            var dirs = new List<string>();
+            foreach (var doc in _docs)
+            {
+                string excel = !string.IsNullOrEmpty(doc.ExcelPath) ? doc.ExcelPath : _sourceExcelPath!;
+                string baseDir = Path.Combine(Path.GetDirectoryName(excel)!, "XCS");
+                string outDir = _docs.Count > 1
+                    ? Path.Combine(baseDir, doc.SkrinkaKey)
+                    : baseDir;
+                Directory.CreateDirectory(outDir);
+                n += XcsProgramGenerator.GenerateAll(doc, outDir);
+                var drills = DrillGenerator.Generate(doc);
+                if (drills.Count > 0)
+                    DrillGenerator.ApplyToCncZnacenia(doc, drills);
+                dirs.Add(outDir);
+            }
 
             RebuildScene();
-            UiInputLogger.Write("Generovat", $"súborov={n}; výstup={outDir}");
+            string outDirMsg = _docs.Count > 1 ? string.Join("\n", dirs) : dirs[0];
+            UiInputLogger.Write("Generovat", $"súborov={n}; skriniek={_docs.Count}");
             TryAutoSaveSession();
-            StatusText.Text = $"Generovať: {n}× .xcs → {outDir}";
+            StatusText.Text = $"Generovať: {n}× .xcs ({_docs.Count} skriniek)";
 
             var ask = MessageBox.Show(this,
-                $"Vygenerované {n} programov (.xcs).\n\n" +
-                "• Kolíky dno/vrch/priecka/chrbat ↔ bok + dno/vrch↔chrbat (A/B)\n" +
-                "• Skrutky do plochy (rovnaká os/pattern ako kolíky)\n" +
-                "• Movento + podperky + závesy plošné (Y od predku; hranové závesy nie)\n" +
-                "• Nohy: _A = kolíky Top, _B = nohy Bottom po otočení (po ABS)\n" +
-                "• Výrezy / zafrezy (CreatePolyline z Excel Vyrezy)\n\n" +
-                $"Priečinok:\n{outDir}\n\n" +
+                $"Vygenerované {n} programov (.xcs) pre {_docs.Count} skriniek.\n\n" +
+                $"Priečinok(y):\n{outDirMsg}\n\n" +
                 "Spustiť XConverter (.xcs → .pgmx)?",
                 "Generovať",
                 MessageBoxButton.YesNo,
@@ -1273,33 +1588,19 @@ public partial class MainWindow : Window
 
             if (ask == MessageBoxResult.Yes)
             {
-                StatusText.Text = "XConverter…";
-                var conv = XConverterRunner.ConvertFolder(outDir, this);
-                StatusText.Text = conv.Ok
-                    ? $"XConverter OK → {outDir}"
-                    : $"XConverter: {conv.Message.Split('\n')[0]}";
-                MessageBox.Show(this, conv.Message,
-                    conv.Ok ? "XConverter" : "XConverter — chyba",
-                    MessageBoxButton.OK,
-                    conv.Ok ? MessageBoxImage.Information : MessageBoxImage.Warning);
-
-                if (!conv.Ok && !string.IsNullOrEmpty(conv.LogPath) && File.Exists(conv.LogPath))
+                foreach (string dir in dirs.Distinct(StringComparer.OrdinalIgnoreCase))
                 {
-                    var openLog = MessageBox.Show(this, "Otvoriť log súbor?",
-                        "XConverter", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                    if (openLog == MessageBoxResult.Yes)
+                    StatusText.Text = $"XConverter… {dir}";
+                    var conv = XConverterRunner.ConvertFolder(dir, this);
+                    if (!conv.Ok)
                     {
-                        try
-                        {
-                            Process.Start(new ProcessStartInfo
-                            {
-                                FileName = conv.LogPath,
-                                UseShellExecute = true
-                            });
-                        }
-                        catch { /* ignore */ }
+                        MessageBox.Show(this, conv.Message,
+                            "XConverter — chyba", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
                     }
                 }
+                MessageBox.Show(this, $"XConverter OK ({dirs.Count} priečinkov).",
+                    "XConverter", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         catch (Exception ex)

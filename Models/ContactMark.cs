@@ -17,6 +17,9 @@ public sealed class ContactMark : INotifyPropertyChanged
     public Vector3D Size { get; init; }
     public int Axis { get; init; }
 
+    /// <summary>Kľúč skrinky (Excel), ku ktorej dotyk patrí.</summary>
+    public string SkrinkaKey { get; set; } = "";
+
     /// <summary>Automatický styk šufľa (bok↔čelo/zad) — v zozname Dotyky sa nezobrazuje.</summary>
     public bool JeSuflikAuto { get; set; }
 

@@ -6,6 +6,16 @@ namespace CncPrieniky3D.Models;
 public sealed class ExportDocument
 {
     public string BlockName { get; set; } = "";
+
+    /// <summary>Cesta k zdrojovému Excelu (multi-skrinka workspace).</summary>
+    public string ExcelPath { get; set; } = "";
+
+    /// <summary>Stabilný kľúč skrinky (napr. skr2 / názov súboru).</summary>
+    public string SkrinkaKey { get; set; } = "";
+
+    /// <summary>Zobrazenie v taboch / strome (napr. „skrinka 2“).</summary>
+    public string SkrinkaLabel { get; set; } = "";
+
     public List<DielecModel> Diely { get; } = new();
     public List<ContactMark> Dotyky { get; } = new();
 
@@ -22,6 +32,12 @@ public sealed class DielecModel
     public string Nazov { get; set; } = "";
     public string Vrstva { get; set; } = "";
     public string Handle { get; set; } = "";
+
+    /// <summary>Kľúč skrinky (Excel), z ktorého dielec pochádza.</summary>
+    public string SkrinkaKey { get; set; } = "";
+
+    /// <summary>Popisok skrinky pre UI.</summary>
+    public string SkrinkaLabel { get; set; } = "";
 
     public double RozmerX { get; set; }
     public double RozmerY { get; set; }
@@ -245,10 +261,17 @@ public sealed class DielecModel
     {
         string displayNazov = PartRules.CncDisplayName(this, PocetKusov);
         string s = $"{Cislo}. {displayNazov}  ({RozmerX:0.#}×{RozmerY:0.#}×{RozmerZ:0.#})";
+        // Prefix skrinky len pri multi-workspace (SkrinkaLabel nastaví UI).
+        if (!string.IsNullOrEmpty(SkrinkaLabel))
+            s = $"[{SkrinkaLabel}] {s}";
         if (JeSuflik)
         {
             if (JeSuflikPozicia)
+            {
                 s = $"{Cislo}. {Nazov}  ({RozmerX:0.#}×{RozmerY:0.#}×{RozmerZ:0.#})  [šufel]";
+                if (!string.IsNullOrEmpty(SkrinkaLabel))
+                    s = $"[{SkrinkaLabel}] {s}";
+            }
             else
             {
                 s += "  [šufel";

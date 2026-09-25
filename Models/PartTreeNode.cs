@@ -10,6 +10,8 @@ public sealed class PartTreeNode : INotifyPropertyChanged
     private bool _isExpanded;
     private bool _isSelected;
 
+    private bool _isMultiSelected;
+
     public PartTreeNode(DielecModel dielec)
     {
         Dielec = dielec;
@@ -45,6 +47,13 @@ public sealed class PartTreeNode : INotifyPropertyChanged
     {
         get => _isSelected;
         set { if (_isSelected == value) return; _isSelected = value; OnPropertyChanged(); }
+    }
+
+    /// <summary>Ctrl+klik multi-výber pre kolíkovanie podľa dielcov.</summary>
+    public bool IsMultiSelected
+    {
+        get => _isMultiSelected;
+        set { if (_isMultiSelected == value) return; _isMultiSelected = value; OnPropertyChanged(); }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

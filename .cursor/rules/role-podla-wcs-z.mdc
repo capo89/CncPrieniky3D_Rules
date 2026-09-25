@@ -14,7 +14,8 @@ alwaysApply: true
 - **Chrbát / traverza / polica / stojka**: z názvu.
 - **Vodorovné panely** (hrúbka = `RozmerZ`): podľa WCS Z:
   - najnižšia = **dno**, najvyššia = **vrch**, medzi = **priecka**.
-- Názov typu „priečka, vrch“ (obe slová) → nerolovať podľa „vrch“; rozhoduje Z.
+- Názov typu „priečka, vrch“ (obe slová) → v skupine rovnakého názvu: nižšia = **priecka**, vyššia = **vrch**
+  (nikdy `[dno]` — samostatné dno v Exceli ostáva dno).
 - **Duplicitný názov** pri načítaní: `DisambiguateDuplicateHorizontalNames` doplní `[dno]` / `[vrch]` / `[priecka]`.
 - **`FindDiel`**: najprv **Diel č.**, potom názov (prefix match po disambiguácii).
 - Kolíky / skrutky / `.xcs` vždy cez `DetectRole(diel, doc)`, nie len názov.

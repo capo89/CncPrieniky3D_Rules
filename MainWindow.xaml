@@ -82,7 +82,7 @@
                    GroupName="Mode" Checked="ViewOption_Changed"/>
       <Separator/>
       <Button Content="Kolíkovať" Click="Kolikovat_Click"
-              ToolTip="Vyžaduje vybranú / označenú styčnú plochu"/>
+              ToolTip="Dotyky: Ctrl+klik plochy. Diely: Ctrl+klik dielce → partneri (Bok L/P…)"/>
       <Button Content="Skrutky" Click="Skrutky_Click"
               ToolTip="Nová séria skrutiek – dialóg ako pri kolíkoch (stred plochy)"/>
       <Button Content="Generovať" Click="Generovat_Click"
@@ -115,6 +115,7 @@
           <DockPanel Grid.Row="0">
             <TextBlock DockPanel.Dock="Top" Style="{StaticResource SectionHeader}" Text="Diely"/>
             <TreeView x:Name="PartList" SelectedItemChanged="PartList_SelectedItemChanged"
+                      PreviewMouseLeftButtonDown="PartList_PreviewMouseLeftButtonDown"
                       PreviewMouseRightButtonDown="PartList_PreviewMouseRightButtonDown">
               <TreeView.ItemContainerStyle>
                 <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
@@ -130,6 +131,10 @@
                       <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                         <Style.Triggers>
                           <DataTrigger Binding="{Binding IsSection}" Value="True">
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="Foreground" Value="{StaticResource AppAccentHi}"/>
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding IsMultiSelected}" Value="True">
                             <Setter Property="FontWeight" Value="SemiBold"/>
                             <Setter Property="Foreground" Value="{StaticResource AppAccentHi}"/>
                           </DataTrigger>
@@ -248,6 +253,15 @@
             <TabItem x:Name="TabCelaSkrinka" Header="Celá skrinka"
                      ToolTip="Korpus + šuflíky; červené kolíky/vŕtania/CNC; bez plôch dotykov"/>
           </TabControl>
+        </Border>
+        <Border x:Name="SkrinkaTabsHost" DockPanel.Dock="Top" Margin="0,0,0,8"
+                Background="{StaticResource AppPanel}"
+                BorderBrush="{StaticResource AppBorder}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Visibility="Collapsed">
+          <TabControl x:Name="SkrinkaTabs"
+                      SelectionChanged="SkrinkaTabs_SelectionChanged"/>
         </Border>
         <StackPanel x:Name="CelaSkrinkaOpacityPanel" DockPanel.Dock="Top"
                     Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed"
